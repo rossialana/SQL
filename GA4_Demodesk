@@ -1,0 +1,48 @@
+SELECT
+  -- 1. TOTAL AMOUNT OF TRAFFIC
+  COUNT(DISTINCT user_pseudo_id) AS total_users,
+
+  -- 2. TOTAL AMOUNT OF SIGNUPS 
+  COUNTIF(t1.event_name = 'Signup CI') AS total_signups,
+
+  -- 3. TOTAL AMOUNT OF DEMOS
+  COUNTIF(t1.event_name = 'Demo button click') AS total_demos,
+
+  -- 4. AMOUNT OF TRAFFIC ON BLOGS AND RESOURCES
+COUNT(DISTINCT
+    CASE
+      -- Usamos o campo page.location diretamente, conforme o schema.
+      -- A coluna 'location' dentro do RECORD 'page' contém a URL completa.
+      WHEN t1.page.location LIKE '%blog%' OR t1.page.location LIKE '%resources%'
+      THEN t1.user_pseudo_id
+    END
+  ) AS users_on_blog_resources,
+
+  -- 5. AMOUNT OF TRAFFIC COMING FROM LLMS
+  -- (Usuários Distintos cuja primeira sessão veio de uma das fontes LLM)
+  COUNT(DISTINCT
+    CASE
+      -- Filtramos por 'session_start' para pegar a primeira fonte da sessão
+      WHEN t1.event_name = 'session_start' AND t1.first_user_traffic_source.source IN (
+        'chatgpt.com',
+        'claude.ai',
+        'perplexity.ai',
+        'gemini.google.com',
+        'copilot.microsoft.com'
+      )
+      THEN t1.user_pseudo_id
+    END
+  ) AS users_from_llm_source,
+
+  -- 6. CONVERSION RATIO (Taxa de Conversão)
+  ROUND 
+  (CASE
+  WHEN COUNT(DISTINCT user_pseudo_id) = 0 THEN 0    
+  ELSE (COUNTIF(event_name = 'Signup CI') + COUNTIF(event_name = 'Demo button click')) / COUNT(DISTINCT user_pseudo_id) * 100
+  END, 2) 
+  AS conversion_rate
+
+FROM
+  -- *** Substitua 'project_id.dataset_id.events_*' pelo seu caminho real ***
+  `demodesk-business-intelligence.superform_outputs_312378099.ga4_events` AS t1
+LIMIT 100
